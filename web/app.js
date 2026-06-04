@@ -1,10 +1,12 @@
 const elements = {
   reloadImagesBtn: document.getElementById("reloadImagesBtn"),
   imageSelect: document.getElementById("imageSelect"),
+  demSelect: document.getElementById("demSelect"),
   loadImageBtn: document.getElementById("loadImageBtn"),
   droneImage: document.getElementById("droneImage"),
   imageStage: document.getElementById("imageStage"),
   overlaySvg: document.getElementById("overlaySvg"),
+  statusBar: document.getElementById("statusBar"),
   locateBtn: document.getElementById("locateBtn"),
   toolButtons: Array.from(document.querySelectorAll(".tool-btn")),
   finishShapeBtn: document.getElementById("finishShapeBtn"),
@@ -16,9 +18,13 @@ const elements = {
 const state = {
   viewer: null,
   defaultTdtToken: "",
+  defaultDemRoot: "",
+  defaultDemPath: "",
+  selectedDemPath: "",
   selectedImagePath: "",
   metadata: null,
   images: [],
+  dems: [],
   annotations: [],
   solvedAnnotations: [],
   currentTool: "point",
@@ -34,9 +40,31 @@ const state = {
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    let errorMessage = `HTTP ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload?.error) {
+        errorMessage = payload.error;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
+}
+
+function setStatus(message = "", kind = "info") {
+  if (!message) {
+    elements.statusBar.hidden = true;
+    elements.statusBar.textContent = "";
+    elements.statusBar.dataset.kind = "";
+    return;
+  }
+
+  elements.statusBar.hidden = false;
+  elements.statusBar.dataset.kind = kind;
+  elements.statusBar.textContent = message;
 }
 
 function setTool(tool) {
@@ -243,6 +271,13 @@ function locateSolvedAnnotations() {
   });
 }
 
+function describeDemSelection(path) {
+  if (!path) {
+    return "当前使用平地假设求交。";
+  }
+  return `当前使用 DEM 地形求交：${formatDemOptionLabel(path)}`;
+}
+
 async function solveAndRenderAnnotations() {
   if (!state.selectedImagePath || !state.annotations.length) {
     state.solvedAnnotations = [];
@@ -259,6 +294,11 @@ async function solveAndRenderAnnotations() {
       vertices: item.vertices,
     })),
     overrides: {},
+    terrain_options: state.selectedDemPath
+      ? {
+          dem_path: state.selectedDemPath,
+        }
+      : {},
   };
   const result = await fetchJson("/api/solve-annotations", {
     method: "POST",
@@ -268,6 +308,11 @@ async function solveAndRenderAnnotations() {
     body: JSON.stringify(payload),
   });
   state.solvedAnnotations = result.annotations;
+  if (result.terrain_options?.dem_path) {
+    setStatus(describeDemSelection(result.terrain_options.dem_path), "success");
+  } else {
+    setStatus("当前使用平地假设求交。", "info");
+  }
   applyMapResults();
 }
 
@@ -296,6 +341,7 @@ async function loadImageMetadata(imagePath) {
   elements.droneImage.src = metadata.image_url;
   elements.droneImage.style.display = "block";
   applyMapResults();
+  setStatus(describeDemSelection(state.selectedDemPath), state.selectedDemPath ? "success" : "info");
 }
 
 async function reloadImages() {
@@ -317,6 +363,48 @@ async function reloadImages() {
     option.textContent = imagePath.split("\\").slice(-1)[0];
     elements.imageSelect.appendChild(option);
   });
+}
+
+function formatDemOptionLabel(demPath) {
+  const parts = demPath.split("\\");
+  const district = parts.at(-2) || "未知区域";
+  const filename = parts.at(-1) || demPath;
+  return `${district} / ${filename}`;
+}
+
+function renderDemOptions() {
+  elements.demSelect.replaceChildren();
+
+  const noneOption = document.createElement("option");
+  noneOption.value = "";
+  noneOption.textContent = "不使用 DEM（平地假设）";
+  elements.demSelect.appendChild(noneOption);
+
+  state.dems.forEach((demPath) => {
+    const option = document.createElement("option");
+    option.value = demPath;
+    option.textContent = formatDemOptionLabel(demPath);
+    elements.demSelect.appendChild(option);
+  });
+
+  if (state.selectedDemPath && state.dems.includes(state.selectedDemPath)) {
+    elements.demSelect.value = state.selectedDemPath;
+  } else if (state.defaultDemPath && state.dems.includes(state.defaultDemPath)) {
+    state.selectedDemPath = state.defaultDemPath;
+    elements.demSelect.value = state.defaultDemPath;
+  } else {
+    state.selectedDemPath = "";
+    elements.demSelect.value = "";
+  }
+}
+
+async function reloadDems() {
+  const query = state.defaultDemRoot
+    ? `?root=${encodeURIComponent(state.defaultDemRoot)}`
+    : "";
+  const result = await fetchJson(`/api/dems${query}`);
+  state.dems = result.dems;
+  renderDemOptions();
 }
 
 function buildTdtProvider(token) {
@@ -408,9 +496,25 @@ function bindEvents() {
 
   elements.reloadImagesBtn.addEventListener("click", async () => {
     try {
-      await reloadImages();
+      await Promise.all([reloadImages(), reloadDems()]);
+      setStatus(describeDemSelection(state.selectedDemPath), state.selectedDemPath ? "success" : "info");
     } catch (error) {
       console.error(error);
+      setStatus(error.message, "error");
+    }
+  });
+
+  elements.demSelect.addEventListener("change", async () => {
+    state.selectedDemPath = elements.demSelect.value || "";
+    const kind = state.selectedDemPath ? "success" : "info";
+    setStatus(describeDemSelection(state.selectedDemPath), kind);
+    if (state.annotations.length) {
+      try {
+        await solveAndRenderAnnotations();
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message, "error");
+      }
     }
   });
 
@@ -423,6 +527,7 @@ function bindEvents() {
       await loadImageMetadata(imagePath);
     } catch (error) {
       console.error(error);
+      setStatus(error.message, "error");
     }
   });
 
@@ -435,6 +540,7 @@ function bindEvents() {
       await finishCurrentShape();
     } catch (error) {
       console.error(error);
+      setStatus(error.message, "error");
     }
   });
 
@@ -445,8 +551,13 @@ function bindEvents() {
       return;
     }
     state.annotations.pop();
-    await solveAndRenderAnnotations();
-    renderOverlay();
+    try {
+      await solveAndRenderAnnotations();
+      renderOverlay();
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message, "error");
+    }
   });
 
   elements.clearCurrentBtn.addEventListener("click", () => {
@@ -454,12 +565,13 @@ function bindEvents() {
     renderOverlay();
   });
 
-  elements.clearAllBtn.addEventListener("click", async () => {
+  elements.clearAllBtn.addEventListener("click", () => {
     state.currentVertices = [];
     state.annotations = [];
     state.solvedAnnotations = [];
     renderOverlay();
     applyMapResults();
+    setStatus(describeDemSelection(state.selectedDemPath), state.selectedDemPath ? "success" : "info");
   });
 
   elements.overlaySvg.addEventListener("click", async (event) => {
@@ -476,7 +588,12 @@ function bindEvents() {
         vertices: [pixel],
       });
       renderOverlay();
-      await solveAndRenderAnnotations();
+      try {
+        await solveAndRenderAnnotations();
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message, "error");
+      }
       return;
     }
 
@@ -491,6 +608,7 @@ function bindEvents() {
         await finishCurrentShape();
       } catch (error) {
         console.error(error);
+        setStatus(error.message, "error");
       }
     }
   });
@@ -513,10 +631,15 @@ async function bootstrap() {
 
   const config = await fetchJson("/api/config");
   state.defaultTdtToken = config.default_tdt_token || "";
+  state.defaultDemRoot = config.default_dem_root || "";
+  state.defaultDemPath = config.default_dem_path || "";
+  state.selectedDemPath = state.defaultDemPath || "";
   applyImageryProviders();
-  await reloadImages();
+  await Promise.all([reloadImages(), reloadDems()]);
+  setStatus(describeDemSelection(state.selectedDemPath), state.selectedDemPath ? "success" : "info");
 }
 
 bootstrap().catch((error) => {
   console.error(error);
+  setStatus(error.message, "error");
 });

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from uav_geo.models import ImageAnnotation, ImagePoint
+from uav_geo.models import ImageAnnotation, ImagePoint, TerrainOptions
 from uav_geo.readers import DjiImageReader
 from uav_geo.service import solve_annotation, solve_image_point, solve_image_points
 
@@ -13,6 +13,9 @@ SAMPLE_IMAGE = Path(
 )
 SAMPLE_IMAGE_NO_AUX = Path(
     r"G:\DJIImage\drone_images\177 2026-01-08 11_29_21 (UTC+08)\DJI_20260108113301_0004_V.jpeg"
+)
+SAMPLE_DEM = Path(
+    r"G:\GIS\Data\Dem\重庆市\不统计\南岸区\重庆市_不统计_南岸区.tif"
 )
 
 
@@ -91,3 +94,19 @@ def test_polygon_annotation_returns_geojson() -> None:
     assert result.geojson["type"] == "Polygon"
     assert len(result.results) == 4
     assert result.geojson["coordinates"][0][0] == result.geojson["coordinates"][0][-1]
+
+
+@pytest.mark.skipif(
+    not SAMPLE_IMAGE.exists() or not SAMPLE_DEM.exists(),
+    reason="DEM 或 DJI 样例图片不存在",
+)
+def test_solver_supports_dem_intersection() -> None:
+    result = solve_image_point(
+        image_path=SAMPLE_IMAGE,
+        point=ImagePoint(u=2016, v=1512),
+        terrain_options=TerrainOptions(dem_path=str(SAMPLE_DEM)),
+    )
+
+    assert result.terrain_model == "dem"
+    assert result.terrain_source == str(SAMPLE_DEM.resolve())
+    assert 100.0 <= result.ground_altitude_m <= 1000.0

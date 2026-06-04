@@ -18,7 +18,8 @@
 
       <section class="panel panel-image">
         <div class="toolbar">
-          <select id="imageSelect" class="image-select"></select>
+          <select id="imageSelect" class="image-select" aria-label="图片选择"></select>
+          <select id="demSelect" class="image-select" aria-label="地形选择"></select>
           <button id="loadImageBtn" class="btn btn-strong" type="button">加载图片</button>
           <button id="reloadImagesBtn" class="btn" type="button">刷新列表</button>
           <button id="locateBtn" class="btn" type="button">定位</button>
@@ -31,9 +32,11 @@
           <button id="clearAllBtn" class="btn btn-danger" type="button">清空全部</button>
         </div>
 
+        <div id="statusBar" class="status-bar" hidden></div>
+
         <div class="image-stage-wrap">
           <div id="imageStage" class="image-stage">
-            <img id="droneImage" alt="无人机图像" />
+            <img id="droneImage" alt="无人机图片" />
             <svg id="overlaySvg" class="overlay-svg"></svg>
           </div>
         </div>

@@ -80,6 +80,30 @@ body {
   min-height: 0;
 }
 
+.status-bar {
+  margin: 0 16px;
+  padding: 10px 14px;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.status-bar[data-kind="info"] {
+  background: rgba(13, 109, 141, 0.12);
+  color: #08485f;
+}
+
+.status-bar[data-kind="success"] {
+  background: rgba(34, 197, 94, 0.12);
+  color: #14532d;
+}
+
+.status-bar[data-kind="error"] {
+  background: rgba(159, 69, 51, 0.14);
+  color: #7c2d12;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

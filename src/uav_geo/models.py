@@ -147,6 +147,23 @@ class CaptureOverrides:
 
 
 @dataclass(slots=True)
+class TerrainOptions:
+    dem_path: str | None = None
+    ray_step_m: float = 10.0
+    binary_search_iterations: int = 24
+
+    def uses_dem(self) -> bool:
+        return bool(self.dem_path)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dem_path": self.dem_path,
+            "ray_step_m": self.ray_step_m,
+            "binary_search_iterations": self.binary_search_iterations,
+        }
+
+
+@dataclass(slots=True)
 class ResolvedCapture:
     image_path: str
     intrinsics: CameraIntrinsics
@@ -173,6 +190,8 @@ class GeoResult:
     slant_range_m: float
     used_camera_orientation: Orientation
     metadata_sources: dict[str, str]
+    terrain_model: str = "plane"
+    terrain_source: str | None = None
     assumptions: list[str] = field(default_factory=list)
 
     def to_coordinate(self) -> list[float]:
@@ -188,6 +207,8 @@ class GeoResult:
             "slant_range_m": self.slant_range_m,
             "used_camera_orientation": self.used_camera_orientation.to_dict(),
             "metadata_sources": dict(self.metadata_sources),
+            "terrain_model": self.terrain_model,
+            "terrain_source": self.terrain_source,
             "assumptions": list(self.assumptions),
         }
 

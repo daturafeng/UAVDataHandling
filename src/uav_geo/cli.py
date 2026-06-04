@@ -4,8 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
-from .models import CaptureOverrides, ImageAnnotation, ImagePoint
-from .server import DEFAULT_TDT_TOKEN, run_server
+from .models import CaptureOverrides, ImageAnnotation, ImagePoint, TerrainOptions
+from .server import DEFAULT_DEM_PATH, DEFAULT_DEM_ROOT, DEFAULT_TDT_TOKEN, run_server
 from .service import solve_annotation, solve_image_point
 
 
@@ -51,6 +51,17 @@ def add_override_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--principal-point-y", dest="principal_point_y_px", type=float)
 
 
+def add_terrain_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--dem-path", dest="dem_path")
+    parser.add_argument("--dem-step", dest="ray_step_m", type=float, default=10.0)
+    parser.add_argument(
+        "--dem-binary-iterations",
+        dest="binary_search_iterations",
+        type=int,
+        default=24,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="UAV image to WGS84 coordinate tools.",
@@ -65,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     point_parser.add_argument("u", type=float)
     point_parser.add_argument("v", type=float)
     add_override_arguments(point_parser)
+    add_terrain_arguments(point_parser)
 
     batch_parser = subparsers.add_parser(
         "batch",
@@ -75,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     batch_group.add_argument("--annotation-json", dest="annotation_json")
     batch_group.add_argument("--annotation-file", dest="annotation_file")
     add_override_arguments(batch_parser)
+    add_terrain_arguments(batch_parser)
 
     serve_parser = subparsers.add_parser(
         "serve",
@@ -87,6 +100,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=r"G:\DJIImage\drone_images",
     )
     serve_parser.add_argument("--tdt-token", default=DEFAULT_TDT_TOKEN)
+    serve_parser.add_argument("--dem-root", default=str(DEFAULT_DEM_ROOT))
+    serve_parser.add_argument("--dem-path", default=str(DEFAULT_DEM_PATH))
 
     return parser
 
@@ -125,16 +140,24 @@ def main(argv: list[str] | None = None) -> int:
             port=args.port,
             sample_root=Path(args.sample_root),
             default_tdt_token=args.tdt_token,
+            default_dem_root=Path(args.dem_root),
+            default_dem_path=Path(args.dem_path) if args.dem_path else None,
         )
         return 0
 
     overrides = CaptureOverrides(**build_common_override_kwargs(args))
+    terrain_options = TerrainOptions(
+        dem_path=args.dem_path,
+        ray_step_m=args.ray_step_m,
+        binary_search_iterations=args.binary_search_iterations,
+    )
 
     if args.command == "point":
         result = solve_image_point(
             image_path=args.image_path,
             point=ImagePoint(u=args.u, v=args.v),
             overrides=overrides,
+            terrain_options=terrain_options,
         )
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         return 0
@@ -150,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
             image_path=args.image_path,
             annotation=annotation,
             overrides=overrides,
+            terrain_options=terrain_options,
         )
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         return 0

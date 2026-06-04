@@ -17,8 +17,10 @@ from .models import (
     ImagePoint,
     ResolvedCapture,
     SolvedAnnotation,
+    TerrainOptions,
 )
 from .readers import DjiImageReader
+from .terrain import intersect_ray_with_dem
 
 
 def resolve_capture(
@@ -50,12 +52,21 @@ def _resolve_ground_altitude(
     return ground_altitude_m, assumptions
 
 
+def _normalize_terrain_options(
+    terrain_options: TerrainOptions | None,
+) -> TerrainOptions:
+    if terrain_options is None:
+        return TerrainOptions()
+    return terrain_options
+
+
 def _solve_point_with_capture(
     capture: ResolvedCapture,
     point: ImagePoint,
     *,
-    ground_altitude_m: float,
+    ground_altitude_m: float | None,
     assumptions: list[str],
+    terrain_options: TerrainOptions,
 ) -> GeoResult:
     drone_state = capture.drone_state
     camera_orientation = drone_state.camera_orientation
@@ -64,11 +75,31 @@ def _solve_point_with_capture(
 
     ray_camera = image_point_to_camera_ray(point, capture.intrinsics)
     ray_enu = camera_ray_to_enu(ray_camera, camera_orientation)
-    intersection = intersect_ray_with_ground_plane(
-        ray_enu=ray_enu,
-        drone_absolute_altitude_m=drone_state.absolute_altitude_m,
-        ground_absolute_altitude_m=ground_altitude_m,
-    )
+    terrain_model = "plane"
+    terrain_source: str | None = None
+    if terrain_options.uses_dem():
+        terrain_intersection = intersect_ray_with_dem(
+            ray_enu=ray_enu,
+            drone_latitude_deg=drone_state.latitude_deg,
+            drone_longitude_deg=drone_state.longitude_deg,
+            drone_absolute_altitude_m=drone_state.absolute_altitude_m,
+            terrain_options=terrain_options,
+        )
+        intersection = (
+            terrain_intersection.east_m,
+            terrain_intersection.north_m,
+            terrain_intersection.up_m,
+        )
+        terrain_model = "dem"
+        terrain_source = str(Path(terrain_options.dem_path).resolve())
+    else:
+        if ground_altitude_m is None:
+            raise ValueError("Plane terrain model requires ground altitude.")
+        intersection = intersect_ray_with_ground_plane(
+            ray_enu=ray_enu,
+            drone_absolute_altitude_m=drone_state.absolute_altitude_m,
+            ground_absolute_altitude_m=ground_altitude_m,
+        )
 
     latitude_deg, longitude_deg, altitude_m = enu_offset_to_geodetic(
         origin_latitude_deg=drone_state.latitude_deg,
@@ -92,6 +123,8 @@ def _solve_point_with_capture(
         slant_range_m=slant_range_m,
         used_camera_orientation=camera_orientation,
         metadata_sources=capture.metadata_sources,
+        terrain_model=terrain_model,
+        terrain_source=terrain_source,
         assumptions=list(assumptions),
     )
 
@@ -100,14 +133,27 @@ def solve_image_point(
     image_path: str | Path,
     point: ImagePoint,
     overrides: CaptureOverrides | None = None,
+    terrain_options: TerrainOptions | None = None,
 ) -> GeoResult:
     capture = resolve_capture(image_path=image_path, overrides=overrides)
-    ground_altitude_m, assumptions = _resolve_ground_altitude(capture, overrides)
+    terrain_options = _normalize_terrain_options(terrain_options)
+    assumptions: list[str]
+    ground_altitude_m: float | None
+    if terrain_options.uses_dem():
+        ground_altitude_m = None
+        assumptions = [
+            f"terrain_model = dem({Path(terrain_options.dem_path).resolve()})",
+            "DEM 高程采样单位为米，且必须与无人机 absolute_altitude_m 使用同一高程基准。",
+        ]
+    else:
+        ground_altitude_m, assumptions = _resolve_ground_altitude(capture, overrides)
+        assumptions.insert(0, "terrain_model = plane")
     return _solve_point_with_capture(
         capture,
         point,
         ground_altitude_m=ground_altitude_m,
         assumptions=assumptions,
+        terrain_options=terrain_options,
     )
 
 
@@ -115,15 +161,28 @@ def solve_image_points(
     image_path: str | Path,
     points: Iterable[ImagePoint],
     overrides: CaptureOverrides | None = None,
+    terrain_options: TerrainOptions | None = None,
 ) -> list[GeoResult]:
     capture = resolve_capture(image_path=image_path, overrides=overrides)
-    ground_altitude_m, assumptions = _resolve_ground_altitude(capture, overrides)
+    terrain_options = _normalize_terrain_options(terrain_options)
+    assumptions: list[str]
+    ground_altitude_m: float | None
+    if terrain_options.uses_dem():
+        ground_altitude_m = None
+        assumptions = [
+            f"terrain_model = dem({Path(terrain_options.dem_path).resolve()})",
+            "DEM 高程采样单位为米，且必须与无人机 absolute_altitude_m 使用同一高程基准。",
+        ]
+    else:
+        ground_altitude_m, assumptions = _resolve_ground_altitude(capture, overrides)
+        assumptions.insert(0, "terrain_model = plane")
     return [
         _solve_point_with_capture(
             capture,
             point,
             ground_altitude_m=ground_altitude_m,
             assumptions=assumptions,
+            terrain_options=terrain_options,
         )
         for point in points
     ]
@@ -160,6 +219,7 @@ def solve_annotation(
     image_path: str | Path,
     annotation: ImageAnnotation,
     overrides: CaptureOverrides | None = None,
+    terrain_options: TerrainOptions | None = None,
 ) -> SolvedAnnotation:
     if annotation.kind == "point" and len(annotation.vertices) != 1:
         raise ValueError("Point annotations must contain exactly one vertex.")
@@ -172,6 +232,7 @@ def solve_annotation(
         image_path=image_path,
         points=annotation.vertices,
         overrides=overrides,
+        terrain_options=terrain_options,
     )
     return SolvedAnnotation(
         annotation_id=annotation.annotation_id,
@@ -187,12 +248,14 @@ def solve_annotations(
     image_path: str | Path,
     annotations: Iterable[ImageAnnotation],
     overrides: CaptureOverrides | None = None,
+    terrain_options: TerrainOptions | None = None,
 ) -> list[SolvedAnnotation]:
     return [
         solve_annotation(
             image_path=image_path,
             annotation=annotation,
             overrides=overrides,
+            terrain_options=terrain_options,
         )
         for annotation in annotations
     ]
