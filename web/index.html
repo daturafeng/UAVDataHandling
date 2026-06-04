@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>无人机图像标注</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/cesium@1.139.0/Build/Cesium/Widgets/widgets.css"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="workspace">
+      <section class="panel panel-map">
+        <div id="cesiumContainer" class="map-surface"></div>
+      </section>
+
+      <section class="panel panel-image">
+        <div class="toolbar">
+          <select id="imageSelect" class="image-select"></select>
+          <button id="loadImageBtn" class="btn btn-strong" type="button">加载图片</button>
+          <button id="reloadImagesBtn" class="btn" type="button">刷新列表</button>
+          <button id="locateBtn" class="btn" type="button">定位</button>
+          <button id="toolPointBtn" class="btn tool-btn" data-tool="point" type="button">点</button>
+          <button id="toolPolylineBtn" class="btn tool-btn" data-tool="polyline" type="button">线</button>
+          <button id="toolPolygonBtn" class="btn tool-btn" data-tool="polygon" type="button">面</button>
+          <button id="finishShapeBtn" class="btn" type="button">确认</button>
+          <button id="undoBtn" class="btn" type="button">撤销</button>
+          <button id="clearCurrentBtn" class="btn" type="button">清空当前</button>
+          <button id="clearAllBtn" class="btn btn-danger" type="button">清空全部</button>
+        </div>
+
+        <div class="image-stage-wrap">
+          <div id="imageStage" class="image-stage">
+            <img id="droneImage" alt="无人机图像" />
+            <svg id="overlaySvg" class="overlay-svg"></svg>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/cesium@1.139.0/Build/Cesium/Cesium.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

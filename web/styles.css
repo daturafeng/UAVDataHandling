@@ -1,0 +1,207 @@
+:root {
+  --bg: #ece7df;
+  --panel: rgba(250, 247, 241, 0.92);
+  --panel-strong: rgba(255, 255, 255, 0.92);
+  --line: rgba(86, 68, 48, 0.16);
+  --text: #201c18;
+  --accent: #0d6d8d;
+  --accent-soft: rgba(13, 109, 141, 0.12);
+  --danger: #9f4533;
+  --shadow: 0 20px 50px rgba(58, 44, 28, 0.15);
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+  --font: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top left, rgba(13, 109, 141, 0.12), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(159, 69, 51, 0.12), transparent 24%),
+    linear-gradient(180deg, #f4efe7, var(--bg));
+  color: var(--text);
+  font-family: var(--font);
+}
+
+body {
+  padding: 20px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.05fr) minmax(540px, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 720px;
+  min-height: 720px;
+  max-height: 720px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  backdrop-filter: blur(14px);
+}
+
+.map-surface {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+}
+
+.map-surface,
+.map-surface .cesium-viewer,
+.map-surface .cesium-viewer-cesiumWidget,
+.map-surface .cesium-widget,
+.map-surface .cesium-widget canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.map-surface .cesium-viewer-bottom {
+  display: none;
+}
+
+.panel-image {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0));
+}
+
+.image-select,
+.btn {
+  height: 42px;
+  border-radius: 999px;
+  font: inherit;
+}
+
+.image-select {
+  min-width: 240px;
+  flex: 1 1 280px;
+  border: 1px solid rgba(75, 59, 42, 0.16);
+  padding: 0 14px;
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.btn {
+  border: 1px solid rgba(75, 59, 42, 0.14);
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(13, 109, 141, 0.35);
+}
+
+.btn-strong {
+  background: linear-gradient(135deg, #0d6d8d, #1698b0);
+  border-color: transparent;
+  color: #fff;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #9f4533, #bb5c48);
+  border-color: transparent;
+  color: #fff;
+}
+
+.tool-btn.is-active {
+  background: var(--accent-soft);
+  border-color: rgba(13, 109, 141, 0.4);
+  color: #08485f;
+}
+
+.image-stage-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+}
+
+.image-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background:
+    linear-gradient(45deg, rgba(12, 57, 71, 0.8), rgba(38, 27, 17, 0.78)),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.05),
+      rgba(255, 255, 255, 0.05) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+}
+
+#droneImage {
+  display: none;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+}
+
+.overlay-svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+@media (max-width: 1280px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    padding: 12px;
+  }
+
+  .panel {
+    height: 420px;
+    min-height: 420px;
+    max-height: 420px;
+  }
+
+  .toolbar {
+    padding: 12px;
+  }
+
+  .image-stage-wrap {
+    padding: 12px;
+  }
+}

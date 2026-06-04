@@ -1,0 +1,9 @@
+{
+  "annotation_id": "line-1",
+  "kind": "polyline",
+  "label": "L1",
+  "vertices": [
+    {"u": 2016, "v": 1512},
+    {"u": 2216, "v": 1512}
+  ]
+}
